@@ -14,7 +14,7 @@ def linearsvc():
     print("Loading dataset ...")
     for l in g:
         data.append(json.loads(l))
-    N = 25000
+    N = 100000
     data = data[:N]
     print("The dataset used has ", len(data), "entries! Of this dataset", N, "entries are used to train the model.")
 
