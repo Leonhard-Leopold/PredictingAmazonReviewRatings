@@ -6,17 +6,18 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report
 from sklearn.svm import LinearSVC
 from sklearn.model_selection import train_test_split
+import joblib
 
+def linearsvc(load):
 
-def linearsvc():
     data = []
     g = gzip.open("Software.json.gz", 'r')
     print("Loading dataset ...")
     for l in g:
         data.append(json.loads(l))
     N = 100000
-    data = data[:N]
     print("The dataset used has ", len(data), "entries! Of this dataset", N, "entries are used to train the model.")
+    data = data[:N]
 
     df = pd.DataFrame.from_records(data)[['overall', 'reviewText']]
     df.fillna("", inplace=True)
@@ -29,6 +30,11 @@ def linearsvc():
 
     print("training model ...")
     clf = LinearSVC(C = 20, class_weight="balanced", verbose=1)
+
+    if load:
+        print("\nLoading previous model weights:\n")
+        clf = joblib.load("weights/linearSVC.sav")
+
     clf.fit(X_train, y_train)
 
     y_pred = clf.predict(X_test)
@@ -45,4 +51,7 @@ def linearsvc():
     x = "This book is ok. It is very average."
     vec = tfidf.transform([x])
     print("'" + x + "' got the rating: ", clf.predict(vec)[0])
+
+    print("\n\nSaving model weights ...")
+    joblib.dump(clf, "weights/linearSVC.sav")
 

@@ -16,13 +16,13 @@ def mapping_to_target_range( x, target_min=1, target_max=5) :
     return x02 * scale + target_min
 
 
-def supervised_learning():
+def supervised_learning(load):
     data = []
     g = gzip.open("Software.json.gz", 'r')
     print("Loading dataset ...")
     for l in g:
         data.append(json.loads(l))
-    N = 100000
+    N = 100
     print("The dataset used has ", len(data), "entries! Of this dataset", N, "entries are used to train the model.")
 
     reviews = []
@@ -65,6 +65,10 @@ def supervised_learning():
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
     model.compile(optimizer=opt, loss='mean_squared_error')
 
+    if load:
+        print("\nLoading previous model weights:\n")
+        model.load_weights('weights/supervisedLearning')
+
     print("Training Model:\n")
     model.fit(train_reviews, train_ratings, batch_size=128, epochs=2, validation_data=(validation_reviews, validation_ratings))
 
@@ -96,4 +100,6 @@ def supervised_learning():
     result = model.predict(x)
     print("'This book is ok. It is very average.' got the rating: ",  result)
 
+    print("\n\nSaving model weights ...")
+    model.save_weights('weights/supervisedLearning')
 

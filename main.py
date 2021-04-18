@@ -9,11 +9,16 @@ method = input("Welcome to our Natural Language Processing project. \nWe are the
                "Enter '2' or 'Supervised' for the Supervised Learning approach\n"
                "Enter '3' or 'Reinforcement' for the Reinforcement Learning approach"
                "\n:").strip().strip("'").strip('"').lower()
+load = input("\nDo you want to load the previously trained model?\n"
+             "Enter 'y' or press the enter key to load the previous model.\n"
+             "Enter 'n' to train a new model."
+             "\n:").strip().strip("'").strip('"').lower()
 
+load = load != "n"
 if method == "1" or method == "linearsvc":
-    linearsvc()
+    linearsvc(load)
 elif method == "2" or method == "supervised":
-    supervised_learning()
+    supervised_learning(load)
 elif method == "3" or method == "reinforcement":
     reinforcement_learning()
 else:
