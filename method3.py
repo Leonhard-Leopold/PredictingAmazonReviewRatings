@@ -1,15 +1,30 @@
 import gzip
 import json
+import pickle
+
 import pandas as pd
 import numpy as np
 import random
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+actions = [1,2,3,4,5]
+
+
+def save_qtable(qtable):
+    f = open("qtable.pkl", "wb")
+    pickle.dump(qtable, f)
+    f.close()
+
+
+def open_qtable():
+    f = open("qtable.pkl", "rb")
+    return pickle.load(f)
 
 
 def process_qtable(qtable, states):
     print_qtable = []
-    actions = [1,2,3,4,5]
     for s in states:
         tmp_row = []
         for a in actions:
@@ -21,7 +36,7 @@ def process_qtable(qtable, states):
 
 def load_data():
     json_data = gzip.open("Software.json.gz", 'r')
-    n = 1000
+    n = 5000
     data = []
     for line in json_data:
         tmp = json.loads(line)
@@ -36,7 +51,7 @@ def load_data():
 
 
 def process_dataset(t_list):
-    count_vector = TfidfVectorizer(max_features=20000)
+    count_vector = CountVectorizer(max_features=20000)
     proc_text = count_vector.fit_transform(t_list['reviewText'])
 
     features = count_vector.get_feature_names()
@@ -92,7 +107,6 @@ def train_agent(t_train, s_train):
     n = 500
     alpha = 0.1
     epsilon = 0.6
-    actions = [1,2,3,4,5]
     qtable = {}
     for i in range(n):
         print("Starting run: " + str(i))
@@ -108,10 +122,42 @@ def train_agent(t_train, s_train):
 
 
 def test_agent(qtable, states, stars):
-    pass
+    predictions = []
+    i = 1
+    for state, star in zip(states, stars):
+        best_state = find_best_match(qtable, state)
+        best_val = -99999
+        pred_star = -1
+        for a in actions:
+            val = qtable[(best_state, a)]
+            if val > best_val:
+                best_val = val
+                pred_star = a
+        assert pred_star != -1
+        print("Test #" + str(i))
+        predictions.append(pred_star)
+        i += 1
+
+    return predictions
 
 
-def reinforcement_learning():
+def find_best_match(qtable, state):
+    best_state = 0
+    best_val = 999999
+    for entry in qtable:
+        q_state = entry[0]
+        val = 0
+        for q, t in zip(q_state, state):
+            val += abs(q-t)
+
+        if val < best_val:
+            best_val = val
+            best_state = q_state
+
+    return best_state
+
+
+def reinforcement_learning(load=False, test=True):
     dataframe = load_data()
     freq_array, vectorizer = process_dataset(dataframe)
     stars = dataframe["overall"].values
@@ -126,9 +172,18 @@ def reinforcement_learning():
         text_test.append(tuple(t))
         star_test.append(int(s))
 
-    qtable = train_agent(text_train, star_train)
+    if not load:
+        qtable = train_agent(text_train, star_train)
+        save_qtable(qtable)
+    else:
+        qtable = open_qtable()
+
     qtable_print = process_qtable(qtable, text_train)
 
-    test = 0
+    # returns tuple (actual star, predicted star)
+    if test:
+        star_predictions = test_agent(qtable, text_test, star_test)
+        print(classification_report(star_test, star_predictions))
 
-reinforcement_learning()
+
+reinforcement_learning(load=False, test=False)
