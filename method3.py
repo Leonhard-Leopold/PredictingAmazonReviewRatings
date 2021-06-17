@@ -12,6 +12,12 @@ from sklearn.metrics import classification_report
 actions = [1,2,3,4,5]
 
 
+###########################################################
+# Saves the learned qtable to a .pkl file
+# Parameters:
+#   - qtable (dict object to save)
+# Returns
+#   -
 def save_qtable(qtable):
     print("Saving qtable...")
     f = open("qtable.pkl", "wb")
@@ -20,6 +26,12 @@ def save_qtable(qtable):
     print("Done!")
 
 
+###########################################################
+# Opens a saved qtable .pkl file
+# Parameters:
+#   -
+# Returns
+#   - qtable (loaded dict object)
 def open_qtable():
     print("Loading qtable...")
     f = open("qtable.pkl", "rb")
@@ -28,6 +40,13 @@ def open_qtable():
     return qtable
 
 
+###########################################################
+# Returns the qtable as a printable array
+# Parameters:
+#   - qtable (dict object to convert)
+#   - states (states tuples)
+# Returns
+#   - print_qtable (array from qtable dict)
 def process_qtable(qtable, states):
     print_qtable = []
     for s in states:
@@ -39,17 +58,25 @@ def process_qtable(qtable, states):
     return print_qtable
 
 
-def load_data():
+###########################################################
+# Loads dataset from .json archive file and saves
+# 'num_data' amount of it into an dataframe
+# Parameters:
+#   - num_data (amount of reviews to load)
+# Returns
+#   - df (dataframe with reviews and stars)
+def load_data(num_data):
     print("Loading dataset...")
     json_data = gzip.open("Software.json.gz", 'r')
-    n = 2000
     data = []
+    star_count = [0, 0, 0, 0, 0]
     for line in json_data:
         tmp = json.loads(line)
         if "reviewText" not in tmp:
             continue
+
         data.append(tmp)
-        if len(data) > n:
+        if len(data) > num_data:
             break
 
     df = pd.DataFrame.from_records(data)[['overall', 'reviewText']]
@@ -57,18 +84,35 @@ def load_data():
     return df
 
 
-def process_dataset(t_list):
+###########################################################
+# Converts review text into a word count vector with
+# 'features' amount of different words
+# Parameters:
+#   - t_list (list of reviews)
+#   - features (number of different words in count vector)
+# Returns
+#   - array (word count vector)
+#   - count_vector (CountVectorizer object)
+def process_dataset(t_list, features):
     print("Processing dataset...")
-    count_vector = CountVectorizer(max_features=20000)
+    count_vector = CountVectorizer(max_features=features)
     proc_text = count_vector.fit_transform(t_list['reviewText'])
 
-    features = count_vector.get_feature_names()
-    # stop_words = count_vector.get_stop_words()
+    #features = count_vector.get_feature_names()
     array = proc_text.toarray()
     print("Done!")
     return array, count_vector
 
 
+###########################################################
+# Searches for the best star to predict in the qtable,
+# based on its entries
+# Parameters:
+#   - qtable (dict object)
+#   - state (state tuple for which the best action is searched)
+#   - actions (list of possible actions)
+# Returns
+#   - best_action (star with highest qtable value)
 def get_best_action(qtable, state, actions):
     max_val = -999999
     best_action = -1
@@ -91,6 +135,13 @@ def get_best_action(qtable, state, actions):
     return best_action
 
 
+###########################################################
+# Returns the reward based on predicted and actual star amount
+# Parameters:
+#   - actual (actual star amount)
+#   - prediction (predicted star amount)
+# Returns
+#   - reward (integer representing the reward)
 def calc_reward(actual, prediction):
     if actual > prediction:
         actual *= -1
@@ -104,21 +155,39 @@ def calc_reward(actual, prediction):
     return reward
 
 
+###########################################################
+# Updates the qtable based on RL formula
+# Parameters:
+#   - qtable (dict object)
+#   - alpha (learning rate)
+#   - reward (integer representing the reward)
+#   - state (state tuple)
+#   - action (star amount)
+# Returns
+#   -
 def update(qtable, alpha, reward, state, action):
     qtable[(state, action)] = qtable[(state, action)] + alpha * (reward - qtable[(state, action)])
 
 
-def train_agent(t_train, s_train):
+###########################################################
+# Main training function. Iterates over training set and
+# first predicts stars randomly. As rounds go on, it chooses
+# stars based on best action in qtable. Fills qtable.
+# Parameters:
+#   - t_train (training word vector list, i.e. states)
+#   - s_train (training star list, i.e. actions )
+#   - rounds (number of rounds to train)
+# Returns
+#   - qtable (dict object)
+def train_agent(t_train, s_train, rounds):
     # alpha: learning rate
     # epsilon: exploration factor
-    # n: number of learning iterations
     print("Starting training process...")
-    n = 500
     alpha = 0.1
     epsilon = 0.6
     qtable = {}
-    for i in range(n):
-        print("Starting run #" + str(i))
+    for i in range(rounds):
+        #print("Starting run #" + str(i))
         for state, star in zip(t_train, s_train):
             best_action = get_best_action(qtable, state, actions)
             if epsilon > random.uniform(0,1):
@@ -131,12 +200,23 @@ def train_agent(t_train, s_train):
     return qtable
 
 
+###########################################################
+# Main testing function. Iterates over testing data set and
+# chooses best action based on qtable
+# Parameters:
+#   - qtable (dict object)
+#   - states (test states list)
+#   - stars (test star list)
+# Returns
+#   - predictions (list of predicted star values)
 def test_agent(qtable, states, stars):
     print("Starting testing process...")
     predictions = []
     i = 1
+    correct = 0
+    wrong = 0
     for state, star in zip(states, stars):
-        print("Test #" + str(i) + "/" + str(len(stars)))
+        #print("Test #" + str(i) + "/" + str(len(stars)))
         best_state = find_best_match(qtable, state)
         best_val = -99999
         pred_star = -1
@@ -147,11 +227,25 @@ def test_agent(qtable, states, stars):
                 pred_star = a
         assert pred_star != -1
         predictions.append(pred_star)
+        #print("Pred:" + str(pred_star) + " | " + str(star))
+        if pred_star == star:
+            correct += 1
+        else:
+            wrong += 1
         i += 1
     print("Done!")
+    print("Right: " + str(correct) + " | Wrong: " + str(wrong))
+
     return predictions
 
 
+###########################################################
+# Searches qtable for state which matches the input state best
+# Parameters:
+#   - qtable (dict object)
+#   - state (state to match)
+# Returns
+#   - best_state (state which matches input state the best)
 def find_best_match(qtable, state):
     best_state = 0
     best_val = 999999
@@ -168,10 +262,21 @@ def find_best_match(qtable, state):
     return best_state
 
 
-def reinforcement_learning(load=False, test=True):
+###########################################################
+# Main reinforcement learning function. Calls all relevant
+# functions and prints classification report
+# Parameters:
+#   - load (Bool if a qtable should be loaded)
+#   - test (Bool if RL agent should test)
+#   - rounds (number of rounds to train)
+#   - features (number of different words in count vector)
+#   - num_data (amount of reviews to load)
+# Returns
+#   -
+def reinforcement_learning(load=False, test=True, rounds=500, features=200, num_data=2000):
     print("Starting reinforcement learning!")
-    dataframe = load_data()
-    freq_array, vectorizer = process_dataset(dataframe)
+    dataframe = load_data(num_data)
+    freq_array, vectorizer = process_dataset(dataframe, features)
     stars = dataframe["overall"].values
 
     text_train, text_test, star_train, star_test = [], [], [], []
@@ -185,17 +290,13 @@ def reinforcement_learning(load=False, test=True):
         star_test.append(int(s))
 
     if not load:
-        qtable = train_agent(text_train, star_train)
+        qtable = train_agent(text_train, star_train, rounds)
         save_qtable(qtable)
     else:
         qtable = open_qtable()
 
     # qtable_print = process_qtable(qtable, text_train)
-
     # returns tuple (actual star, predicted star)
     if test:
         star_predictions = test_agent(qtable, text_test, star_test)
         print(classification_report(star_test, star_predictions))
-
-
-reinforcement_learning(load=False, test=True)
