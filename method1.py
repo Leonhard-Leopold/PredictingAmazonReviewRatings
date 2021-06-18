@@ -7,6 +7,7 @@ from sklearn.metrics import classification_report
 from sklearn.svm import LinearSVC
 from sklearn.model_selection import train_test_split
 import joblib
+import re
 
 
 ###########################################################
@@ -31,6 +32,11 @@ def linearsvc(load):
     # creating pandas dataframe with two needed columns
     df = pd.DataFrame.from_records(data)[['overall', 'reviewText']]
     df.fillna("", inplace=True)
+
+    # remove all unwanted chars
+    df['reviewText'] = df['reviewText'].map(lambda a: re.compile(r'[^a-z0-9\s]')
+                                            .sub(r'', re.compile(r'[\W]').sub(r' ', a.lower())))
+
     # vectorized the input texts
     tfidf = TfidfVectorizer(max_features=20000, ngram_range=(1, 5), analyzer='char')
     print("Preprocessing ...")
