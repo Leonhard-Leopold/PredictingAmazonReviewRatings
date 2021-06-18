@@ -42,7 +42,7 @@ def supervised_learning(load):
     print("Loading dataset ...")
     for l in g:
         data.append(json.loads(l))
-    N = 25000
+    N = 100000
     print("The dataset used has ", len(data), "entries! Of this dataset", N, "entries are used to train the model.")
 
     reviews = []
@@ -58,7 +58,7 @@ def supervised_learning(load):
         ratings.append(rating)
 
     # vectorized the input texts
-    max_features = 20000
+    max_features = 200
     tokenizer = Tokenizer(num_words=max_features)
     tokenizer.fit_on_texts(reviews)
     reviews = tokenizer.texts_to_sequences(reviews)
@@ -114,29 +114,6 @@ def supervised_learning(load):
 
     # printing the classification report
     print(classification_report(test_ratings,np.round(test_pred)))
-
-    # testing the model with 3 examples (positive, negative, neutral review)
-    print("\nTesting model: ")
-    x = "I really like this book. It is one of the best I have read."
-    x = re.compile(r'[^a-z\s]').sub(r'', re.compile(r'[\W]').sub(r' ', x.lower()))
-    x = tokenizer.texts_to_sequences(np.array([x]))
-    x = tf.keras.preprocessing.sequence.pad_sequences(x, maxlen=max_length)
-    result = model.predict(x)
-    print("'I really like this book. It is one of the best I have read.' got the rating: ", result)
-
-    x = "I really hate this book. It is one of the worst I have read."
-    x = re.compile(r'[^a-z\s]').sub(r'', re.compile(r'[\W]').sub(r' ', x.lower()))
-    x = tokenizer.texts_to_sequences(np.array([x]))
-    x = tf.keras.preprocessing.sequence.pad_sequences(x, maxlen=max_length)
-    result = model.predict(x)
-    print("'I really hate this book. It is one of the worst I have read.' got the rating: ", result)
-
-    x = "This book is ok. It is very average."
-    x = re.compile(r'[^a-z\s]').sub(r'', re.compile(r'[\W]').sub(r' ', x.lower()))
-    x = tokenizer.texts_to_sequences(np.array([x]))
-    x = tf.keras.preprocessing.sequence.pad_sequences(x, maxlen=max_length)
-    result = model.predict(x)
-    print("'This book is ok. It is very average.' got the rating: ", result)
 
     # saving the model weights
     print("\n\nSaving model weights ...")
