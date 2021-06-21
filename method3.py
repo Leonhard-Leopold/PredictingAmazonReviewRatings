@@ -55,7 +55,7 @@ def process_qtable(qtable, states):
             tmp_row.append(qtable[(s, a)])
         print_qtable.append(tmp_row)
 
-    return print_qtable
+    return np.array(print_qtable)
 
 
 ###########################################################
@@ -69,11 +69,39 @@ def load_data(num_data):
     print("Loading dataset...")
     json_data = gzip.open("Software.json.gz", 'r')
     data = []
+    adjectives = np.loadtxt('english-adjectives.txt', dtype=str)
     star_count = [0, 0, 0, 0, 0]
     for line in json_data:
         tmp = json.loads(line)
         if "reviewText" not in tmp:
             continue
+        star = tmp["overall"]
+
+        if star == 1.0:
+            mean = (star_count[4] + star_count[1] + star_count[2] + star_count[3]) / 4
+            if mean + 10 < star_count[0]:
+                continue
+            star_count[0] += 1
+        elif star == 2.0:
+            mean = (star_count[0] + star_count[4] + star_count[2] + star_count[3]) / 4
+            if mean + 10 < star_count[1]:
+                continue
+            star_count[1] += 1
+        elif star == 3.0:
+            mean = (star_count[0] + star_count[1] + star_count[4] + star_count[3]) / 4
+            if mean + 10 < star_count[2]:
+                continue
+            star_count[2] += 1
+        elif star == 4.0:
+            mean = (star_count[0] + star_count[1] + star_count[2] + star_count[4]) / 4
+            if mean + 10 < star_count[3]:
+                continue
+            star_count[3] += 1
+        elif star == 5.0:
+            mean = (star_count[0] + star_count[1] + star_count[2] + star_count[3]) / 4
+            if mean + 10 < star_count[4]:
+                continue
+            star_count[4] += 1
 
         data.append(tmp)
         if len(data) > num_data:
@@ -81,7 +109,7 @@ def load_data(num_data):
 
     df = pd.DataFrame.from_records(data)[['overall', 'reviewText']]
     print("Done!")
-    return df
+    return df, adjectives
 
 
 ###########################################################
@@ -98,10 +126,10 @@ def process_dataset(t_list, features):
     count_vector = CountVectorizer(max_features=features)
     proc_text = count_vector.fit_transform(t_list['reviewText'])
 
-    #features = count_vector.get_feature_names()
+    features = count_vector.get_feature_names()
     array = proc_text.toarray()
     print("Done!")
-    return array, count_vector
+    return array, count_vector, features
 
 
 ###########################################################
@@ -183,7 +211,7 @@ def train_agent(t_train, s_train, rounds):
     # alpha: learning rate
     # epsilon: exploration factor
     print("Starting training process...")
-    alpha = 0.1
+    alpha = 0.5
     epsilon = 0.6
     qtable = {}
     for i in range(rounds):
@@ -209,7 +237,7 @@ def train_agent(t_train, s_train, rounds):
 #   - stars (test star list)
 # Returns
 #   - predictions (list of predicted star values)
-def test_agent(qtable, states, stars):
+def test_agent(qtable, states, stars, word_weights):
     print("Starting testing process...")
     predictions = []
     i = 1
@@ -217,15 +245,8 @@ def test_agent(qtable, states, stars):
     wrong = 0
     for state, star in zip(states, stars):
         #print("Test #" + str(i) + "/" + str(len(stars)))
-        best_state = find_best_match(qtable, state)
-        best_val = -99999
-        pred_star = -1
-        for a in actions:
-            val = qtable[(best_state, a)]
-            if val > best_val:
-                best_val = val
-                pred_star = a
-        assert pred_star != -1
+        best_state = find_best_match(qtable, state, word_weights)
+        pred_star = get_best_action(qtable, best_state, actions)
         predictions.append(pred_star)
         #print("Pred:" + str(pred_star) + " | " + str(star))
         if pred_star == star:
@@ -234,7 +255,7 @@ def test_agent(qtable, states, stars):
             wrong += 1
         i += 1
     print("Done!")
-    print("Right: " + str(correct) + " | Wrong: " + str(wrong))
+    #print("Right: " + str(correct) + " | Wrong: " + str(wrong))
 
     return predictions
 
@@ -246,20 +267,32 @@ def test_agent(qtable, states, stars):
 #   - state (state to match)
 # Returns
 #   - best_state (state which matches input state the best)
-def find_best_match(qtable, state):
+def find_best_match(qtable, state, word_weights):
     best_state = 0
     best_val = 999999
     for entry in qtable:
         q_state = entry[0]
         val = 0
+        i = 0
         for q, t in zip(q_state, state):
-            val += abs(q-t)
+            val += abs(q-t)# * word_weights[i]
 
         if val < best_val:
             best_val = val
             best_state = q_state
-
+        i += 1
     return best_state
+
+
+def create_weight_list(adj, words):
+    word_weights = np.ones(len(words))
+    for i in range(len(words)):
+        for a in adj:
+            if a == words[i]:
+                #print(a)
+                word_weights[i] = 2
+
+    return word_weights
 
 
 ###########################################################
@@ -273,11 +306,13 @@ def find_best_match(qtable, state):
 #   - num_data (amount of reviews to load)
 # Returns
 #   -
-def reinforcement_learning(load=False, test=True, rounds=500, features=200, num_data=2000):
+def reinforcement_learning(load=False, test=True, rounds=500, features=200, num_data=10000):
     print("Starting reinforcement learning!")
-    dataframe = load_data(num_data)
-    freq_array, vectorizer = process_dataset(dataframe, features)
+    dataframe, adjectives = load_data(num_data)
+    freq_array, vectorizer, words = process_dataset(dataframe, features)
     stars = dataframe["overall"].values
+
+    word_weights = create_weight_list(adjectives, words)
 
     text_train, text_test, star_train, star_test = [], [], [], []
 
@@ -289,14 +324,15 @@ def reinforcement_learning(load=False, test=True, rounds=500, features=200, num_
         text_test.append(tuple(t))
         star_test.append(int(s))
 
+    star_train = np.array(star_train)
+    star_test = np.array(star_test)
+
     if not load:
         qtable = train_agent(text_train, star_train, rounds)
         save_qtable(qtable)
     else:
         qtable = open_qtable()
-
-    # qtable_print = process_qtable(qtable, text_train)
-    # returns tuple (actual star, predicted star)
+    #table = process_qtable(qtable, text_train)
     if test:
-        star_predictions = test_agent(qtable, text_test, star_test)
+        star_predictions = test_agent(qtable, text_test, star_test, word_weights)
         print(classification_report(star_test, star_predictions))
