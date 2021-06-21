@@ -284,6 +284,14 @@ def find_best_match(qtable, state, word_weights):
     return best_state
 
 
+###########################################################
+# Creates a weight vector based on adjectives which then
+# are valued more in comparing states
+# Parameters:
+#   - adj (List of english adjectives)
+#   - words (List of feature words)
+# Returns
+#   - word_weights (List of weights)
 def create_weight_list(adj, words):
     word_weights = np.ones(len(words))
     for i in range(len(words)):
