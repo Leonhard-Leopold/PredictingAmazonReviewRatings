@@ -20,6 +20,6 @@ if method == "1" or method == "linearsvc":
 elif method == "2" or method == "supervised":
     supervised_learning(load)
 elif method == "3" or method == "reinforcement":
-    reinforcement_learning(load=False, test=True, rounds=50, features=800, num_data=2000)
+    reinforcement_learning(load=False, test=True, rounds=500, features=200, num_data=8000)
 else:
     print("Invalid Input!!")

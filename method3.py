@@ -314,7 +314,7 @@ def create_weight_list(adj, words):
 #   - num_data (amount of reviews to load)
 # Returns
 #   -
-def reinforcement_learning(load=False, test=True, rounds=500, features=200, num_data=10000):
+def reinforcement_learning(load=False, test=True, rounds=500, features=200, num_data=8000):
     print("Starting reinforcement learning!")
     dataframe, adjectives = load_data(num_data)
     freq_array, vectorizer, words = process_dataset(dataframe, features)
